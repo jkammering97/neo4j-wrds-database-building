@@ -1,0 +1,10 @@
+*.venv
+*.env
+monolithic/
+wrds/
+postgres_process/
+*.sql
+*.ipynb
+local_int/
+logs/
+*.xlsx
