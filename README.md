@@ -1,9 +1,12 @@
 # Creating Company, ECC, Participant and Statement Nodes and Edges on Neo4J
 
-This project builds a graph database of earnings conference call (ECC) data using metadata and transcript components from the WRDS Capital IQ dataset. Data flows through a local **PostgreSQL** database for normalization and indexing before being pushed into **Neo4j**.
+This project builds a graph database of earnings conference call (ECC) data using metadata and transcript components from the WRDS Capital IQ dataset. 
+
+Data flows through a local **PostgreSQL** database for normalization and indexing before being pushed into **Neo4j** for Master Data (Company and ECC) - [ECC/Company Data Process](#-ecc_company_datapy)
+
+For Statement and Participant Data, JSON files are used for intermediate local storage before being uploaded to the graph database - [Statement/Participant Data Process](#-statement_participant_datapy)
 
 ---
-
 ## Overview of the System
 
 - **Source:** WRDS CIQ Transcripts (via SQL queries)
@@ -104,6 +107,11 @@ Fetch **Statements** and **Participants** from WRDS per company, save as JSON, a
    - `batch_participants_unique.json`: Unique participant metadata.
 
 4. **Upload to Neo4j:**
+   - these are run for two different approaches: FIRST ITERATION & SECOND ITERATION
+      - it was commented out which one was not run
+      - the main difference is the following:
+         - FIRST ITERATION: Nodes and Edges are inserted using Neo4j's CREATE
+            - here they had 
    - Nodes:
      - `Statement {text, order, transcriptcomponentid}`
      - `Participant {name, type, transcriptpersonid}`
@@ -156,17 +164,45 @@ Database: `ecc_pg_db`
 
 ## Running the Pipeline
 
-### 1. Setup `.env` File
-WRDS_USERNAME=your_wrds_username
-WRDS_PASSWORD=your_wrds_password
-POSTGRE_PASSWORD=your_pg_password
-NEO4JEXTUSER=your_neo4j_user
-NEO4JEXTPASS=your_neo4j_password
+### 1. Install requirements in virtual env
+pip install -r requirements.txt
 
-### 2. Create and Post to Neo4j: ECC and Company Masterdata
-run in interactive shell
+### 2. Setup `.env` File
+`WRDS_USERNAME=your_wrds_username`
 
-### 3. Create and Post to Neo4j: Statements and Participants
+`WRDS_PASSWORD=your_wrds_password`
+
+`POSTGRE_PASSWORD=your_pg_password`
+
+`NEO4JEXTUSER=your_neo4j_user`
+
+`NEO4JEXTPASS=your_neo4j_password`
+
+### 3. Create Unique Constraints in Neo4j
+these should be created before any data is pushed to the Neo4j database, since 
+the CREATE functionality will only fail for duplicates when the constraints are in place.
+This allows for fast upload in the two step approch (FIRST ITERATION, SECOND ITERATION)
+
+**for ECCs:**
+
+`CREATE CONSTRAINT ecc_keydevid_unique IF NOT EXISTS FOR (e:ECC) REQUIRE e.keydevid IS UNIQUE`
+
+**for Statements:**
+
+`CREATE CONSTRAINT c_transcriptcomponentid_unique IF NOT EXISTS FOR (s:Statement) REQUIRE s.c_transcriptcomponentid IS UNIQUE`
+
+_this next constraint is only helpful for the later chunk creation when the id property is used for a MATCH lookup_
+
+`CREATE CONSTRAINT statement_id_unique IF NOT EXISTS FOR (s:Statement) REQUIRE s.id IS UNIQUE`
+
+**for Participants:**
+
+`CREATE CONSTRAINT c_transcriptpersonid_unique IF NOT EXISTS FOR (p:Participant) REQUIRE p.c_transcriptpersonid IS UNIQUE`
+
+### 4. Create and Post to Neo4j: ECC and Company Masterdata
+run in interactive mode (https://code.visualstudio.com/docs/python/jupyter-support-py)
+
+### 5. Create and Post to Neo4j: Statements and Participants
 ```bash
 python statement_participant_data.py
 
